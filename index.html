@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>I3A18-"P" to play Music</title>
+<style>
+           html, body {
+                width: 100%;
+                height: 100%;
+            }
+
+            body {
+                background-color: #ffffff;
+                margin: 0;
+                overflow: hidden;
+                font-family: arial;
+            }
+
+            #blocker {
+
+                position: absolute;
+
+                width: 100%;
+                height: 100%;
+
+                background-color: rgba(0,0,0,0.5);
+				
+				                width: 100%;
+                height: 100%;
+                box-align: center;
+                color: #ffffff;
+                text-align: center;
+                cursor: pointer;
+
+            }
+#container{
+	    z-index: 0; left:0px; top:0px;
+	    overflow: hidden;
+	    position: absolute;
+
+	    width: 100%;
+	    height: 100%;
+    }	
+
+</style>
+</head>
+
+<body> 
+
+<div id="container"></div>
+
+
+
+<script src="js/r69/three.min.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+
+<script src="js/dat.gui.min.js"></script>
+<script src="ccd_box.js"></script>
+
+<audio id="bgm1" style="display:none">
+<source src="bgs/op1.mp3" type='audio/mp3'>
+</audio>
+
+
+<div id="blocker">
+
+                <span style="font-size:40px">Click to play</span>
+                <br />
+                (Mouse to Move, P to play music)
+				Made By I3A18 林睿騏
+</div>
+
+
+ 
+<script>
+var scene, renderer, camera;
+var controls;
+var keyboard = new KeyboardState();
+var arm, arm2;
+var joint,bat;
+
+var speed = 500;
+var Cend = new THREE.Vector3(0,0,0);
+var pos = new THREE.Vector3(0,0,-100);
+var end,start,dis = 0;
+var ball;
+var dir = new THREE.Vector3();
+var tmp = new THREE.Vector3();
+
+
+var theta1,theta2;
+var boxMaterial, boxMaterial2;
+var container;
+var clock = new THREE.Clock();
+var mouse = new THREE.Vector2();
+var end;
+var target = new THREE.Vector3();
+
+var blocker = document.getElementById( 'blocker' );
+            var instructions = document.getElementById( 'blocker' );
+
+            var havePointerLock = 1;
+            if ( havePointerLock ) {
+                var element = document.body;
+                var pointerlockchange = function ( event ) {
+                       controls.enabled = true;
+                        blocker.style.display = 'none';
+                    } 
+                instructions.addEventListener( 'click', function ( event ) {
+                    instructions.style.display = 'none';
+					}, false );
+					
+}
+
+
+
+init();
+animate();
+
+function init()
+{
+	container = document.getElementById ("container");
+	var width = container.clientWidth;
+	var height = container.clientHeight;
+
+	renderer = new THREE.WebGLRenderer({antialias: true});
+	renderer.setSize (width, height);
+	renderer.setClearColor (0x888888);
+//////////////////////////add scene////////////////////////////
+
+	theta1 = 0;
+	theta2 = 0;
+
+	scene = new THREE.Scene();
+
+	camera = new THREE.PerspectiveCamera (50, width/height, 1, 10000);
+	camera.position.y = 150;
+	camera.position.z = 250;
+	camera.lookAt (new THREE.Vector3(0,0,0));
+
+	container.appendChild (renderer.domElement);
+	controls = new THREE.OrbitControls (camera, renderer.domElement, container);
+
+	// first link
+	var boxGeometry = new THREE.BoxGeometry (60, 10,10);
+	boxMaterial = new THREE.MeshLambertMaterial ({color: 0x00ffff, wireframe:false});
+	var armMesh = new THREE.Mesh (boxGeometry, boxMaterial);
+	arm = new THREE.Object3D();
+	arm.add (armMesh);
+	arm.position.set(0,5,0);
+	armMesh.translateOnAxis (new THREE.Vector3(1,0,0), 60/2);
+	scene.add (arm);
+
+	// second link
+	boxGeometry = new THREE.BoxGeometry (60, 10,10);
+	boxMaterial2 = new THREE.MeshLambertMaterial ({color: 0xff00ff, wireframe:false});
+	var armMesh2 = new THREE.Mesh (boxGeometry, boxMaterial2);
+	arm2 = new THREE.Object3D();
+	arm2.add (armMesh2);
+	arm2.translateOnAxis (new THREE.Vector3(1,0,0), 60);
+	armMesh2.translateOnAxis (new THREE.Vector3(1,0,0), 60/2);
+	arm.add (arm2);
+	
+	//joints
+	var jointGeometry = new THREE.CylinderGeometry (9,9,6,32);
+	var jointMaterial = new THREE.MeshLambertMaterial ({color: 0x00ff00});
+	joint = new THREE.Mesh (jointGeometry, jointMaterial);
+	joint.translateOnAxis (new THREE.Vector3(1,0,0), 60);
+	//joint.position.setY (6);
+	joint.castShadow = true;
+	arm.add(joint);
+	
+	//the bat(?)
+	var batGeometry = new THREE.CylinderGeometry (10,10,11,32);
+	var batMaterial = new THREE.MeshLambertMaterial ({color: 0x888888});
+	bat = new THREE.Mesh (batGeometry, batMaterial);
+	bat.translateOnAxis (new THREE.Vector3(1,0,0), 60);
+	//joint.position.setY (6);
+	bat.castShadow = true;
+	arm2.add(bat);
+	
+	// end effector
+	var cyl_geom = new THREE.CylinderGeometry (10,10,11,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0x00ffff});
+	end = new THREE.Mesh (cyl_geom, cyl_mat);
+	end.position.set(0,5,0);
+	scene.add (end);
+
+
+	// target set
+	var cyl_geom = new THREE.CylinderGeometry (15,15,11,32);
+	var cyl_mat = new THREE.MeshLambertMaterial ({color: 0xff0000});
+	ball = new THREE.Mesh (cyl_geom, cyl_mat);
+	scene.add (ball);
+/////////////////////////////////////////////////////////////////////////
+/////////////////////set wall///////////////////
+	var wallTexture = new THREE.ImageUtils.loadTexture ('pic/wall.jpg');
+	var wallMat = new THREE.MeshLambertMaterial ({map: wallTexture});
+	wallMat.map.wrapS = wallMat.map.wrapT = THREE.RepeatWrapping;
+	wallMat.map.repeat.set (1, 1);
+	var wallGeo = new THREE.BoxGeometry (430, 1, 20);
+	var wallF = new THREE.Mesh (wallGeo, wallMat);
+	var wallR = wallF.clone();
+	var wallL = wallF.clone();var wallN = wallF.clone();
+	
+	wallF.rotation.x = Math.PI/2;
+	
+	wallR.rotation.x = Math.PI/2;
+	wallR.rotation.z = Math.PI/2;
+	
+	wallL.rotation.x = Math.PI/2;
+	wallL.rotation.z = Math.PI/2;
+	
+	wallN.rotation.x = Math.PI/2;
+	
+	wallF.position.set (0, 10, -415);
+	wallR.position.set (215, 10, -200);
+	wallL.position.set (-215, 10, -200);
+	wallN.position.set (0, 10, 15);
+		
+	var wall = new THREE.Object3D();
+	wall.add (wallF);
+	wall.add (wallR);
+	wall.add (wallL);
+	wall.add (wallN);
+	scene.add (wall);
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////floor///////////////////////////////
+	var floorTexture = new THREE.ImageUtils.loadTexture ('pic/skull.jpg');
+	var floorGeometry = new THREE.BoxGeometry (430, 1, 430);
+	var floorMaterial = new THREE.MeshLambertMaterial ({map: floorTexture});
+	floorMaterial.map.wrapS = floorMaterial.map.wrapT = THREE.RepeatWrapping;
+	floorMaterial.map.repeat.set (1, 1);
+	var floor = new THREE.Mesh (floorGeometry, floorMaterial);
+	floor.castShadow = true;
+	floor.position.set (0, -1, -200);
+	scene.add (floor);
+/////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	/////////////////////////////////////////////////////////////////////
+	/*var gridXZ = new THREE.GridHelper(100, 10);
+	gridXZ.setColors( new THREE.Color(0xff0000), new THREE.Color(0xffffff) );
+	scene.add(gridXZ);*/
+
+	var pointLight = new THREE.PointLight (0xffffff);
+	pointLight.position.set (0,300,200);
+	scene.add (pointLight);
+	var pointLight = new THREE.PointLight (0xffffff);
+	pointLight.position.set (-200,300,0);
+	scene.add (pointLight);
+	
+	var ambientLight = new THREE.AmbientLight (0x111111); 
+	scene.add(ambientLight);
+
+	/////////////////////////skybox/////////////////////////////////////
+	var imagePrefix = "pic/dawnmountain-";
+	var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+	var imageSuffix = ".png";
+	var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );	
+	
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
+	/////////////////////////////////////////////////////////////////////
+	
+	
+	window.addEventListener ('resize', onWindowResize, false);	
+	renderer.domElement.addEventListener ('mousemove', onDocumentMouseMove, false);
+}
+
+//
+// somehow this gives error in r68
+// (must use r69)
+//
+function onDocumentMouseMove( event ) {
+	event.preventDefault();
+	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+	// tracer: find intersection on xz plane
+	var depth0 = new THREE.Vector3( mouse.x, mouse.y, 0.0 ).unproject( camera );
+	var depth1 = new THREE.Vector3( mouse.x, mouse.y, 1.0 ).unproject( camera );
+	//debugger;
+	var t = depth0.y / (depth0.y - depth1.y);
+	var x = depth0.x + t * (depth1.x - depth0.x);
+	var z = depth0.z + t * (depth1.z - depth0.z);
+	target.set (x,0,z);
+}
+
+function animate()
+{
+	dt = clock.getDelta();
+
+	tmp.subVectors(pos, Cend);
+	dis = tmp.length();
+	
+	if( pos.x > 200 ){ 
+		dir.x = -1 * dir.x;
+	}
+	if( pos.x < -200 ){ 
+		dir.x = -1 * dir.x;
+	}
+	if( pos.z < -400 ){ 
+		dir.z = -1 * dir.z;	
+	}
+	if( pos.z > -0 ){ 
+		dir.z = -1 * dir.z;	
+	}
+
+	pos.add (dir);	
+	ball.position.set (pos.x, 0, pos.z);
+
+	requestAnimationFrame ( animate );  // timer callback
+	update();
+	render();  // display callback
+}
+
+function collision(){
+	dir.copy(tmp.normalize());
+	dir.multiplyScalar (dt*speed);	
+	 
+}
+
+function update()
+{
+	keyboard.update();
+	controls.update();
+	
+//////////////////////////add music first//////////////////////
+	if ( keyboard.down("P"))  // yes, must use UPPER CASE
+		bgm1.play();
+	
+	if ( keyboard.down("R"))
+		;
+	
+	//theta1 = gcontrols.theta1;
+	//theta2 = gcontrols.theta2;
+	//boxMaterial.wireframe = gcontrols.wireshow;
+	//boxMaterial2.wireframe = gcontrols.wireshow;
+	
+	if( dis <= 25.5 ){
+		speed = 500;
+		collision();
+	}
+
+	/*var joints = [];
+	for (var i = 0; i < 3; i++) joints[i] = new THREE.Vector3();
+	*/
+	//var dt = clock.getElapsedTime();
+	
+	var theta = [theta1, theta2]; // for call-by-reference
+	ik_ccd (target, theta);
+	//console.log ("THETA1&2: " + theta1 + ", " + theta2);
+	console.log(target.x + " " + target.z)
+}
+
+function onWindowResize()
+{
+	var width = container.clientWidth;
+	var height = container.clientHeight;
+	camera.aspect = width / height;
+	camera.updateProjectionMatrix();
+	renderer.setSize (width, height);
+}
+
+
+function render()
+{
+	arm.rotation.y = theta1;
+	arm2.rotation.y = theta2;
+	
+	renderer.render (scene, camera);
+}
+</script>
+</body>
+
+</html>
